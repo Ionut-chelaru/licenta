@@ -334,9 +334,19 @@
       const w = canvas.width;
       const h = canvas.height;
 
-      // Schelet
-      ctx.strokeStyle = "#00ff00";
-      ctx.lineWidth = 2;
+      // Configurări culori în funcție de adâncimea squat-ului (ug)
+      let culoare = "#ff3333"; // Roșu (prea sus)
+      if (ug < 120) culoare = "#ffcc00"; // Galben
+      if (ug < 100) culoare = "#00ff88"; // Verde (perfect)
+
+      // 1. Desenăm scheletul cu un efect de GLOW
+      ctx.strokeStyle = culoare;
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = culoare;
+
       conexiuni.forEach(([i, j]) => {
         ctx.beginPath();
         ctx.moveTo(lm[i][0] * w, lm[i][1] * h);
@@ -344,20 +354,62 @@
         ctx.stroke();
       });
 
-      // Articulații cheie
+      // Resetăm shadow pentru restul desenului (ca să nu fie blurat totul)
+      ctx.shadowBlur = 0;
+
+      // 2. Articulații cheie (Cercuri pline)
       [11, 23, 25, 27].forEach(i => {
         ctx.beginPath();
-        ctx.arc(lm[i][0] * w, lm[i][1] * h, 6, 0, 2 * Math.PI);
-        ctx.fillStyle = "#ff0000";
+        ctx.arc(lm[i][0] * w, lm[i][1] * h, 7, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ffffff";
         ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = culoare;
+        ctx.stroke();
       });
 
-      // Unghiuri
-      ctx.font = "bold 16px sans-serif";
-      ctx.fillStyle = "#ffff00";
-      ctx.fillText(ug + "°", lm[25][0] * w + 10, lm[25][1] * h);
-      ctx.fillStyle = "#ff6600";
-      ctx.fillText(us + "°", lm[23][0] * w + 10, lm[23][1] * h);
+      // 3. Desenăm un ARC DE CERC la genunchi pentru unghi
+      // Punctele: Sold(23), Genunchi(25), Glezna(27)
+      const gX = lm[25][0] * w;
+      const gY = lm[25][1] * h;
+      
+      // Desenăm arcul
+      ctx.beginPath();
+      ctx.arc(gX, gY, 40, 0, 2 * Math.PI);
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.lineWidth = 5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      // Un arc care se umple invers proporțional cu unghiul
+      const startAngle = -Math.PI / 2;
+      const progress = Math.min(1, Math.max(0, (180 - ug) / 90));
+      ctx.arc(gX, gY, 40, startAngle, startAngle + (progress * 2 * Math.PI));
+      ctx.strokeStyle = culoare;
+      ctx.lineWidth = 6;
+      ctx.stroke();
+
+      // 4. Label-uri unghiuri stilizate (Box)
+      deseneazaLabel(ctx, ug + "°", gX + 50, gY, culoare);
+      deseneazaLabel(ctx, us + "° Spate", lm[23][0] * w + 50, lm[23][1] * h, "#3b82f6");
+    }
+
+    function deseneazaLabel(ctx, text, x, y, col) {
+      ctx.font = "bold 18px sans-serif";
+      const textMetrics = ctx.measureText(text);
+      const padding = 6;
+      
+      // Fundal label
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(x - padding, y - 18, textMetrics.width + padding * 2, 24);
+      
+      // Bordură mică laterală
+      ctx.fillStyle = col;
+      ctx.fillRect(x - padding, y - 18, 4, 24);
+      
+      // Text
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(text, x + 2, y);
     }
   </script>
 </body>

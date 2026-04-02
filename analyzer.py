@@ -18,15 +18,13 @@ SOLD_STANG     = 23
 GENUNCHI_STANG = 25
 GLEZNA_STANGA  = 27
 
-# Conexiuni schelet pentru desenat pe canvas
+# Conexiuni schelet pentru desenat pe canvas (fără mâini)
 CONEXIUNI = [
-    (11, 13), (13, 15),
-    (12, 14), (14, 16),
-    (11, 12),
-    (11, 23), (12, 24),
-    (23, 24),
-    (23, 25), (25, 27),
-    (24, 26), (26, 28),
+    (11, 12),           # Umeri
+    (11, 23), (12, 24), # Torso (Umeri -> Șolduri)
+    (23, 24),           # Șolduri
+    (23, 25), (25, 27), # Picior stâng
+    (24, 26), (26, 28), # Picior drept
 ]
 
 
@@ -75,6 +73,11 @@ def analizeaza_squat(cale_video):
     total_cadre = 0
     date_cadre = []  # date schelet per cadru, trimise la frontend
 
+    # Pentru stabilitate - memorăm ultima poziție validă
+    last_lm_smooth = None
+    last_world_smooth = None
+    ALPHA = 0.2  # Factor de netezire (0.1 = foarte stabil/lent, 0.9 = reactiv/jittery)
+
     while cap.isOpened():
         ret, cadru = cap.read()
         if not ret:
@@ -90,15 +93,40 @@ def analizeaza_squat(cale_video):
             continue
 
         cadre_cu_persoana += 1
-        lm_world   = rezultat.pose_world_landmarks[0]
-        lm_imagine = rezultat.pose_landmarks[0]
+        
+        # Landmark-uri brute
+        raw_world = rezultat.pose_world_landmarks[0]
+        raw_img   = rezultat.pose_landmarks[0]
 
-        if not corp_este_vertical(lm_world):
+        # 1. Aplicăm filtrul EMA pe coordonatele de imagine (pentru desenat)
+        current_img = np.array([[lm.x, lm.y] for lm in raw_img])
+        if last_lm_smooth is None:
+            last_lm_smooth = current_img
+        else:
+            last_lm_smooth = ALPHA * current_img + (1 - ALPHA) * last_lm_smooth
+        
+        pozitii_smooth = last_lm_smooth.tolist()
+
+        # 2. Aplicăm filtrul EMA pe coordonatele WORLD (pentru calcule unghiuri)
+        # Avem nevoie de x, y, z pentru unghiuri 3D
+        current_world = np.array([[lm.x, lm.y, lm.z] for lm in raw_world])
+        if last_world_smooth is None:
+            last_world_smooth = current_world
+        else:
+            last_world_smooth = ALPHA * current_world + (1 - ALPHA) * last_world_smooth
+        
+        # Reconstruim obiecte compatibile cu calculeaza_unghi_3d
+        class Point3D:
+            def __init__(self, coords): self.x, self.y, self.z = coords
+        
+        lm_world_smooth = [Point3D(c) for c in last_world_smooth]
+
+        if not corp_este_vertical(lm_world_smooth):
             date_cadre.append(None)
             continue
 
-        unghi_genunchi = calculeaza_unghi_3d(lm_world[SOLD_STANG], lm_world[GENUNCHI_STANG], lm_world[GLEZNA_STANGA])
-        unghi_spate    = calculeaza_unghi_3d(lm_world[UMAR_STANG], lm_world[SOLD_STANG], lm_world[GENUNCHI_STANG])
+        unghi_genunchi = calculeaza_unghi_3d(lm_world_smooth[SOLD_STANG], lm_world_smooth[GENUNCHI_STANG], lm_world_smooth[GLEZNA_STANGA])
+        unghi_spate    = calculeaza_unghi_3d(lm_world_smooth[UMAR_STANG], lm_world_smooth[SOLD_STANG], lm_world_smooth[GENUNCHI_STANG])
 
         # Numărare repetări
         if unghi_genunchi < 100:
@@ -111,10 +139,9 @@ def analizeaza_squat(cale_video):
             cadre_cu_miscare_squat += 1
             scoruri_cadre.append(scor_cadru_squat(unghi_genunchi, unghi_spate))
 
-        # Salvăm pozițiile normalizate (0-1) ale tuturor landmark-urilor pentru canvas
-        pozitii = [[lm.x, lm.y] for lm in lm_imagine]
+        # Salvăm pozițiile netezite (0-1) ale tuturor landmark-urilor pentru canvas
         date_cadre.append({
-            "lm": pozitii,
+            "lm": pozitii_smooth,
             "ug": round(unghi_genunchi, 1),
             "us": round(unghi_spate, 1),
         })
@@ -168,7 +195,7 @@ def genereaza_feedback(scoruri, repetari):
     if medie >= 85:
         feedback.append("Formă excelentă la squat!")
     elif medie >= 65:
-        feedback.append("Formă decentă, dar există loc de îmbunătățire.")
+        feedback.append("Formă decentă, dar există loc de îmbunățiverire.")
     else:
         feedback.append("Forma necesită corecții — urmărește sfaturile de mai jos.")
 

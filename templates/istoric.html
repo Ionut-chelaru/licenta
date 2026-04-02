@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <title>Istoric - Antrenor Virtual</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; padding: 40px; margin: 0; display: flex; flex-direction: column; align-items: center; }
+    #container { width: 100%; max-width: 800px; }
+    h1 { margin-bottom: 24px; font-size: 1.8rem; display: flex; justify-content: space-between; align-items: center; }
+    .btn { padding: 8px 16px; background: #2a2a2a; color: #aaa; text-decoration: none; border-radius: 6px; font-size: 0.9rem; }
+    .btn:hover { background: #333; color: white; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #1a1a1a; border-radius: 12px; overflow: hidden; }
+    th { text-align: left; color: #666; padding: 16px; border-bottom: 2px solid #222; text-transform: uppercase; font-size: 0.8rem; }
+    td { padding: 16px; border-bottom: 1px solid #222; color: #ccc; }
+    .scor { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1>
+      Istoric Sesiuni
+      <a href="/" class="btn">← Înapoi la Upload</a>
+    </h1>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Exercițiu</th>
+          <th>Repetări</th>
+          <th>Scor Formă</th>
+        </tr>
+      </thead>
+      <tbody id="corpTabelIstoric">
+        <!-- JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    async function incarcaIstoric() {
+      const raspuns = await fetch("/istoric_date");
+      const date = await raspuns.json();
+      const corp = document.getElementById("corpTabelIstoric");
+      corp.innerHTML = "";
+
+      if (date.length === 0) {
+        corp.innerHTML = "<tr><td colspan='4' style='text-align:center; padding:40px; color:#555;'>Nicio sesiune salvată încă.</td></tr>";
+        return;
+      }
+
+      date.forEach(s => {
+        const tr = document.createElement("tr");
+        let colScor = "#ff3333";
+        if (s.scor >= 65) colScor = "#ffcc00";
+        if (s.scor >= 85) colScor = "#00ff88";
+
+        tr.innerHTML = `
+          <td>${s.data.substring(5, 16)}</td>
+          <td>${s.exercitiu}</td>
+          <td>${s.repetari}</td>
+          <td class="scor" style="color:${colScor};">${s.scor}%</td>
+        `;
+        corp.appendChild(tr);
+      });
+    }
+    incarcaIstoric();
+  </script>
+</body>
+</html>

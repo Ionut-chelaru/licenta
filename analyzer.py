@@ -12,11 +12,15 @@ MODEL_URL = (
     "pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
 )
 
-# Indici landmark MediaPipe
+# Indici landmark MediaPipe (stânga și dreapta)
 UMAR_STANG     = 11
+UMAR_DREPT     = 12
 SOLD_STANG     = 23
+SOLD_DREPT     = 24
 GENUNCHI_STANG = 25
+GENUNCHI_DREPT = 26
 GLEZNA_STANGA  = 27
+GLEZNA_DREAPTA = 28
 
 # Conexiuni schelet pentru desenat pe canvas (fără mâini)
 CONEXIUNI = [
@@ -26,6 +30,12 @@ CONEXIUNI = [
     (23, 25), (25, 27), # Picior stâng
     (24, 26), (26, 28), # Picior drept
 ]
+
+
+class Point3D:
+    """Wrapper simplu pentru coordonate 3D, compatibil cu calculeaza_unghi_3d."""
+    def __init__(self, coords):
+        self.x, self.y, self.z = coords
 
 
 def verifica_model():
@@ -49,7 +59,28 @@ def corp_este_vertical(lm_world):
     umar = np.array([lm_world[UMAR_STANG].x, lm_world[UMAR_STANG].y])
     sold  = np.array([lm_world[SOLD_STANG].x,  lm_world[SOLD_STANG].y])
     diff = sold - umar
-    return abs(diff[1]) > abs(diff[0])
+    # Prag relaxat — la squat adânc trunchiul se apleacă natural
+    return abs(diff[1]) > abs(diff[0]) * 0.6
+
+
+def alege_partea_vizibila(lm_world):
+    """
+    Alege partea corpului (stânga/dreapta) cu vizibilitate mai bună.
+    Returnează indicii (umar, sold, genunchi, glezna) pentru partea aleasă.
+    """
+    viz_stanga = (
+        lm_world[SOLD_STANG].visibility +
+        lm_world[GENUNCHI_STANG].visibility +
+        lm_world[GLEZNA_STANGA].visibility
+    )
+    viz_dreapta = (
+        lm_world[SOLD_DREPT].visibility +
+        lm_world[GENUNCHI_DREPT].visibility +
+        lm_world[GLEZNA_DREAPTA].visibility
+    )
+    if viz_dreapta > viz_stanga:
+        return UMAR_DREPT, SOLD_DREPT, GENUNCHI_DREPT, GLEZNA_DREAPTA
+    return UMAR_STANG, SOLD_STANG, GENUNCHI_STANG, GLEZNA_STANGA
 
 
 def analizeaza_squat(cale_video):
@@ -90,10 +121,13 @@ def analizeaza_squat(cale_video):
 
         if not rezultat.pose_world_landmarks:
             date_cadre.append(None)
+            # Resetăm EMA — poziția veche nu mai e relevantă
+            last_lm_smooth = None
+            last_world_smooth = None
             continue
 
         cadre_cu_persoana += 1
-        
+
         # Landmark-uri brute
         raw_world = rezultat.pose_world_landmarks[0]
         raw_img   = rezultat.pose_landmarks[0]
@@ -104,29 +138,27 @@ def analizeaza_squat(cale_video):
             last_lm_smooth = current_img
         else:
             last_lm_smooth = ALPHA * current_img + (1 - ALPHA) * last_lm_smooth
-        
+
         pozitii_smooth = last_lm_smooth.tolist()
 
         # 2. Aplicăm filtrul EMA pe coordonatele WORLD (pentru calcule unghiuri)
-        # Avem nevoie de x, y, z pentru unghiuri 3D
         current_world = np.array([[lm.x, lm.y, lm.z] for lm in raw_world])
         if last_world_smooth is None:
             last_world_smooth = current_world
         else:
             last_world_smooth = ALPHA * current_world + (1 - ALPHA) * last_world_smooth
-        
-        # Reconstruim obiecte compatibile cu calculeaza_unghi_3d
-        class Point3D:
-            def __init__(self, coords): self.x, self.y, self.z = coords
-        
+
         lm_world_smooth = [Point3D(c) for c in last_world_smooth]
 
         if not corp_este_vertical(lm_world_smooth):
             date_cadre.append(None)
             continue
 
-        unghi_genunchi = calculeaza_unghi_3d(lm_world_smooth[SOLD_STANG], lm_world_smooth[GENUNCHI_STANG], lm_world_smooth[GLEZNA_STANGA])
-        unghi_spate    = calculeaza_unghi_3d(lm_world_smooth[UMAR_STANG], lm_world_smooth[SOLD_STANG], lm_world_smooth[GENUNCHI_STANG])
+        # Alegem partea corpului cu vizibilitate mai bună
+        idx_umar, idx_sold, idx_genunchi, idx_glezna = alege_partea_vizibila(raw_world)
+
+        unghi_genunchi = calculeaza_unghi_3d(lm_world_smooth[idx_sold], lm_world_smooth[idx_genunchi], lm_world_smooth[idx_glezna])
+        unghi_spate    = calculeaza_unghi_3d(lm_world_smooth[idx_umar], lm_world_smooth[idx_sold], lm_world_smooth[idx_genunchi])
 
         # Numărare repetări
         if unghi_genunchi < 100:
@@ -195,7 +227,7 @@ def genereaza_feedback(scoruri, repetari):
     if medie >= 85:
         feedback.append("Formă excelentă la squat!")
     elif medie >= 65:
-        feedback.append("Formă decentă, dar există loc de îmbunățiverire.")
+        feedback.append("Formă decentă, dar există loc de îmbunătățire.")
     else:
         feedback.append("Forma necesită corecții — urmărește sfaturile de mai jos.")
 

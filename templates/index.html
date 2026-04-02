@@ -357,12 +357,19 @@
       const w = canvas.width;
       const h = canvas.height;
 
+      // Dimensiuni proporționale cu rezoluția videoului
+      const scala = h / 500;
+      const RAZA_ARC = Math.round(h * 0.04);
+      const FONT_SIZE = Math.round(18 * scala);
+      const LINIE_GROSIME = Math.max(2, Math.round(2 * scala));
+      const PUNCT_RAZA = Math.max(4, Math.round(4 * scala));
+
       let culoare = "#ff3333";
       if (ug < 120) culoare = "#ffcc00";
       if (ug < 100) culoare = "#00ff88";
 
       ctx.strokeStyle = culoare;
-      ctx.lineWidth = 4;
+      ctx.lineWidth = LINIE_GROSIME;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
       ctx.shadowBlur = 10;
@@ -379,7 +386,7 @@
 
       [11, 23, 25, 27].forEach(i => {
         ctx.beginPath();
-        ctx.arc(lm[i][0] * w, lm[i][1] * h, 7, 0, 2 * Math.PI);
+        ctx.arc(lm[i][0] * w, lm[i][1] * h, PUNCT_RAZA, 0, 2 * Math.PI);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
         ctx.lineWidth = 2;
@@ -389,12 +396,11 @@
 
       const gX = lm[25][0] * w;
       const gY = lm[25][1] * h;
-      const RAZA_ARC = 50; 
-      
+
       ctx.beginPath();
       ctx.arc(gX, gY, RAZA_ARC, 0, 2 * Math.PI);
       ctx.strokeStyle = "rgba(255,255,255,0.15)";
-      ctx.lineWidth = 5;
+      ctx.lineWidth = Math.max(3, Math.round(3 * scala));
       ctx.stroke();
 
       ctx.beginPath();
@@ -402,27 +408,27 @@
       const progress = Math.min(1, Math.max(0, (180 - ug) / 90));
       ctx.arc(gX, gY, RAZA_ARC, startAngle, startAngle + (progress * 2 * Math.PI));
       ctx.strokeStyle = culoare;
-      ctx.lineWidth = 8;
+      ctx.lineWidth = Math.max(4, Math.round(5 * scala));
       ctx.stroke();
 
-      deseneazaLabel(ctx, ug + "°", gX + RAZA_ARC + 10, gY, culoare);
-      deseneazaLabel(ctx, us + "° Spate", lm[23][0] * w + RAZA_ARC + 10, lm[23][1] * h, "#3b82f6");
+      deseneazaLabel(ctx, ug + "°", gX + RAZA_ARC + 10, gY, culoare, FONT_SIZE);
+      deseneazaLabel(ctx, us + "° Spate", lm[23][0] * w + RAZA_ARC + 10, lm[23][1] * h, "#3b82f6", FONT_SIZE);
     }
 
-    function deseneazaLabel(ctx, text, x, y, col) {
-      ctx.font = "bold 36px sans-serif"; 
-      const textMetrics = ctx.measureText(text);
-      const textWidth = textMetrics.width;
-      const paddingH = 15;
-      
+    function deseneazaLabel(ctx, text, x, y, col, fontSize) {
+      ctx.font = "bold " + fontSize + "px sans-serif";
+      const textWidth = ctx.measureText(text).width;
+      const paddingH = Math.round(fontSize * 0.4);
+      const boxH = Math.round(fontSize * 1.5);
+
       ctx.fillStyle = "rgba(0,0,0,0.8)";
-      ctx.fillRect(x - paddingH, y - 35, textWidth + paddingH * 2, 50);
-      
+      ctx.fillRect(x - paddingH, y - boxH * 0.7, textWidth + paddingH * 2, boxH);
+
       ctx.fillStyle = col;
-      ctx.fillRect(x - paddingH, y - 35, 8, 50);
-      
+      ctx.fillRect(x - paddingH, y - boxH * 0.7, Math.round(fontSize * 0.2), boxH);
+
       ctx.fillStyle = "#ffffff";
-      ctx.fillText(text, x + 5, y + 5);
+      ctx.fillText(text, x + Math.round(fontSize * 0.15), y + fontSize * 0.15);
     }
   </script>
 </body>

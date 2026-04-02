@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Antrenor Virtual</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: sans-serif;
+      background: #111;
+      color: #eee;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Ecran upload ── */
+    #ecran-upload {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 40px 20px;
+    }
+
+    h1 { font-size: 2rem; margin-bottom: 8px; }
+    p.subtitlu { color: #888; margin-bottom: 24px; }
+
+    .avertisment {
+      font-size: 0.78rem;
+      color: #f59e0b;
+      margin-bottom: 24px;
+      max-width: 420px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .zona-upload {
+      background: #1e1e1e;
+      border: 2px dashed #444;
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      width: 100%;
+      max-width: 420px;
+      transition: border-color 0.2s;
+    }
+    .zona-upload:hover { border-color: #888; }
+    .zona-upload input { display: none; }
+    .zona-upload label { cursor: pointer; color: #aaa; font-size: 1rem; }
+    .zona-upload .nume-fisier { margin-top: 10px; color: #ccc; font-size: 0.9rem; }
+
+    button {
+      margin-top: 20px;
+      padding: 12px 32px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { background: #444; cursor: default; }
+
+    #incarcare { margin-top: 20px; color: #888; display: none; }
+    #eroare { margin-top: 14px; color: #f87171; font-size: 0.9rem; display: none; max-width: 420px; text-align: center; }
+
+    /* ── Ecran rezultate (split) ── */
+    #ecran-rezultat {
+      display: none;
+      height: 100vh;
+      width: 100vw;
+    }
+    #ecran-rezultat.vizibil {
+      display: flex;
+    }
+
+    /* Jumătatea stângă — video */
+    #jumatate-video {
+      width: 50vw;
+      height: 100vh;
+      background: #000;
+      position: relative;
+      flex-shrink: 0;
+    }
+    #jumatate-video video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    #jumatate-video canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* Jumătatea dreaptă — rezultate */
+    #jumatate-rezultate {
+      width: 50vw;
+      height: 100vh;
+      overflow-y: auto;
+      background: #161616;
+      padding: 40px 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    #jumatate-rezultate h2 { font-size: 1.4rem; }
+
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .stat span:first-child { color: #888; }
+    .stat span:last-child { font-weight: bold; font-size: 1.1rem; }
+
+    .bara-scor-bg {
+      background: #333;
+      border-radius: 8px;
+      height: 14px;
+      overflow: hidden;
+    }
+    .bara-scor {
+      height: 100%;
+      border-radius: 8px;
+      background: #3b82f6;
+      transition: width 0.6s ease;
+    }
+
+    .feedback-titlu { color: #888; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .feedback li {
+      list-style: none;
+      padding: 8px 0;
+      border-bottom: 1px solid #2a2a2a;
+      color: #ccc;
+      font-size: 0.95rem;
+    }
+
+    #btn-inapoi {
+      margin-top: auto;
+      background: #2a2a2a;
+      color: #aaa;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      align-self: flex-start;
+    }
+    #btn-inapoi:hover { background: #333; color: #eee; }
+  </style>
+</head>
+<body>
+
+  <!-- Ecran upload -->
+  <div id="ecran-upload">
+    <h1>Antrenor Virtual</h1>
+    <p class="subtitlu">Analizează-ți forma la squat.</p>
+
+    <p class="avertisment">
+      ⚠ Asigură-te că tot corpul este vizibil în cadru și că nu există obiecte care blochează vederea asupra corpului în timpul exercițiului.
+    </p>
+
+    <div class="zona-upload">
+      <input type="file" id="inputFisier" accept="video/*" />
+      <label for="inputFisier">Apasă pentru a selecta un video</label>
+      <div class="nume-fisier" id="numeFisier">Niciun fișier selectat</div>
+    </div>
+
+    <button id="btnAnalizeaza" disabled>Analizează</button>
+    <div id="incarcare">Se analizează... poate dura câteva secunde.</div>
+    <div id="eroare"></div>
+  </div>
+
+  <!-- Ecran rezultate split -->
+  <div id="ecran-rezultat">
+
+    <!-- Stânga: video + canvas overlay -->
+    <div id="jumatate-video">
+      <video id="videoOriginal" controls></video>
+      <canvas id="canvasSchelet"></canvas>
+    </div>
+
+    <!-- Dreapta: rezultate -->
+    <div id="jumatate-rezultate">
+      <h2 id="numeExercitiu">Rezultate</h2>
+
+      <div>
+        <div class="stat">
+          <span>Repetări detectate</span>
+          <span id="valRepetari">—</span>
+        </div>
+        <div class="stat">
+          <span>Scor formă</span>
+          <span id="valScor">—</span>
+        </div>
+        <div class="bara-scor-bg" style="margin-top: 12px;">
+          <div class="bara-scor" id="baraScor" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div>
+        <p class="feedback-titlu">Feedback</p>
+        <ul class="feedback" id="listaFeedback"></ul>
+      </div>
+
+      <button id="btn-inapoi">← Analizează alt video</button>
+    </div>
+
+  </div>
+
+  <script>
+    const inputFisier    = document.getElementById("inputFisier");
+    const numeFisier     = document.getElementById("numeFisier");
+    const btnAnalizeaza  = document.getElementById("btnAnalizeaza");
+    const incarcare      = document.getElementById("incarcare");
+    const eroare         = document.getElementById("eroare");
+    const ecranUpload    = document.getElementById("ecran-upload");
+    const ecranRezultat  = document.getElementById("ecran-rezultat");
+    const video          = document.getElementById("videoOriginal");
+    const canvas         = document.getElementById("canvasSchelet");
+    const ctx            = canvas.getContext("2d");
+
+    let dateAnaliza = null;
+
+    inputFisier.addEventListener("change", () => {
+      if (inputFisier.files.length > 0) {
+        numeFisier.textContent = inputFisier.files[0].name;
+        btnAnalizeaza.disabled = false;
+      }
+    });
+
+    btnAnalizeaza.addEventListener("click", async () => {
+      const fisier = inputFisier.files[0];
+      if (!fisier) return;
+
+      const formData = new FormData();
+      formData.append("video", fisier);
+
+      btnAnalizeaza.disabled = true;
+      incarcare.style.display = "block";
+      eroare.style.display = "none";
+
+      try {
+        const raspuns = await fetch("/analizeaza", { method: "POST", body: formData });
+        const date = await raspuns.json();
+
+        incarcare.style.display = "none";
+
+        if (date.eroare) {
+          eroare.textContent = date.eroare;
+          eroare.style.display = "block";
+          btnAnalizeaza.disabled = false;
+          return;
+        }
+
+        // Populează rezultatele
+        document.getElementById("numeExercitiu").textContent = "Analiză — " + date.exercitiu;
+        document.getElementById("valRepetari").textContent = date.repetari;
+        document.getElementById("valScor").textContent = date.scor + " / 100";
+        document.getElementById("baraScor").style.width = date.scor + "%";
+
+        const listaFeedback = document.getElementById("listaFeedback");
+        listaFeedback.innerHTML = "";
+        date.feedback.forEach(mesaj => {
+          const li = document.createElement("li");
+          li.textContent = mesaj;
+          listaFeedback.appendChild(li);
+        });
+
+        video.src = URL.createObjectURL(fisier);
+        dateAnaliza = date;
+
+        // Trece la ecranul de rezultate
+        ecranUpload.style.display = "none";
+        ecranRezultat.classList.add("vizibil");
+
+      } catch (e) {
+        incarcare.style.display = "none";
+        eroare.textContent = "Ceva a mers greșit. Serverul rulează?";
+        eroare.style.display = "block";
+        btnAnalizeaza.disabled = false;
+      }
+    });
+
+    // Buton înapoi
+    document.getElementById("btn-inapoi").addEventListener("click", () => {
+      ecranRezultat.classList.remove("vizibil");
+      ecranUpload.style.display = "flex";
+      video.src = "";
+      dateAnaliza = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      btnAnalizeaza.disabled = false;
+    });
+
+    // Canvas dimensiuni sincronizate cu video
+    video.addEventListener("loadedmetadata", () => {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+    });
+
+    video.addEventListener("play", desenLoop);
+    video.addEventListener("pause",  deseneazaCadruCurent);
+    video.addEventListener("seeked", deseneazaCadruCurent);
+
+    function desenLoop() {
+      if (video.paused || video.ended) return;
+      deseneazaCadruCurent();
+      requestAnimationFrame(desenLoop);
+    }
+
+    function deseneazaCadruCurent() {
+      if (!dateAnaliza) return;
+
+      const { cadre, fps, conexiuni } = dateAnaliza;
+      const indiceCadru = Math.floor(video.currentTime * fps);
+      const dateCadru = cadre[Math.min(indiceCadru, cadre.length - 1)];
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!dateCadru) return;
+
+      const { lm, ug, us } = dateCadru;
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // Schelet
+      ctx.strokeStyle = "#00ff00";
+      ctx.lineWidth = 2;
+      conexiuni.forEach(([i, j]) => {
+        ctx.beginPath();
+        ctx.moveTo(lm[i][0] * w, lm[i][1] * h);
+        ctx.lineTo(lm[j][0] * w, lm[j][1] * h);
+        ctx.stroke();
+      });
+
+      // Articulații cheie
+      [11, 23, 25, 27].forEach(i => {
+        ctx.beginPath();
+        ctx.arc(lm[i][0] * w, lm[i][1] * h, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ff0000";
+        ctx.fill();
+      });
+
+      // Unghiuri
+      ctx.font = "bold 16px sans-serif";
+      ctx.fillStyle = "#ffff00";
+      ctx.fillText(ug + "°", lm[25][0] * w + 10, lm[25][1] * h);
+      ctx.fillStyle = "#ff6600";
+      ctx.fillText(us + "°", lm[23][0] * w + 10, lm[23][1] * h);
+    }
+  </script>
+</body>
+</html>
